@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Árbol binario de expresiones</title>
+</head>
+<body>
+  <h1>Árbol binario de expresiones aritméticas</h1>
+  <p>Solo números de 1 dígito (0-9) y operadores + - * / (se pueden usar paréntesis).</p>
+
+  <h2>1. Expresión normal: árbol, Preorder y Postorder</h2>
+  <input type="text" id="infija" size="40"> Ejemplo: (3+4)*2-8/4
+  <br><br>
+  <button onclick="tarea1()">Construir árbol</button>
+  <pre id="out1"></pre>
+
+  <hr>
+
+  <h2>2. Resolver una expresión en Preorder</h2>
+  <input type="text" id="preorder" size="40"> Ejemplo: - * + 3 4 2 / 8 4
+  <br><br>
+  <button onclick="tarea2()">Resolver preorder</button>
+  <pre id="out2"></pre>
+
+  <hr>
+
+  <h2>3. Resolver una expresión en Postorder</h2>
+  <input type="text" id="postorder" size="40"> Ejemplo: 3 4 + 2 * 8 4 / -
+  <br><br>
+  <button onclick="tarea3()">Resolver postorder</button>
+  <pre id="out3"></pre>
+
+  <script>
+    // ============================================================
+    // Funciones generales
+    // ============================================================
+
+    // Regresa true si x es uno de los operadores permitidos
+    function esOperador(x) {
+      return x == "+" || x == "-" || x == "*" || x == "/";
+    }
+
+    // Regresa true si x es un solo dígito (0-9)
+    function esDigito(x) {
+      return x.length == 1 && x >= "0" && x <= "9";
+    }
+
+    // Prioridad de cada operador: * y / mandan sobre + y -
+    function prioridad(op) {
+      if (op == "+" || op == "-") return 1;
+      return 2;
+    }
+
+    // Hace la operación indicada entre a y b
+    function operar(op, a, b) {
+      if (op == "+") return a + b;
+      if (op == "-") return a - b;
+      if (op == "*") return a * b;
+      if (op == "/") {
+        if (b == 0) throw new Error("división entre cero");
+        return a / b;
+      }
+    }
+
+    // Redondea para no mostrar decimales larguísimos (ej: 10/3)
+    function formato(n) {
+      return Math.round(n * 10000) / 10000;
+    }
+
+    // Quita todos los espacios de un texto
+    function quitarEspacios(texto) {
+      return texto.replace(/\s/g, "");
+    }
+
+    // Escribe texto en un elemento de la página
+    function escribir(id, texto) {
+      document.getElementById(id).textContent = texto;
+    }
+
+    // ============================================================
+    // Árbol binario
+    // ============================================================
+
+    // Cada nodo guarda un valor (número u operador) y sus dos hijos
+    function crearNodo(valor) {
+      return { valor: valor, izq: null, der: null };
+    }
+
+    // Recorrido preorder: raíz, izquierda, derecha
+    function preorder(nodo, lista) {
+      if (nodo == null) return;
+      lista.push(nodo.valor);
+      preorder(nodo.izq, lista);
+      preorder(nodo.der, lista);
+    }
+
+    // Recorrido postorder: izquierda, derecha, raíz
+    function postorder(nodo, lista) {
+      if (nodo == null) return;
+      postorder(nodo.izq, lista);
+      postorder(nodo.der, lista);
+      lista.push(nodo.valor);
+    }
+
+    // Resuelve el árbol de forma recursiva (sirve para comprobar)
+    function resolverArbol(nodo) {
+      if (esDigito(nodo.valor)) return Number(nodo.valor);
+      let a = resolverArbol(nodo.izq);
+      let b = resolverArbol(nodo.der);
+      return operar(nodo.valor, a, b);
+    }
+
+    // Dibuja el árbol de lado: la raíz a la izquierda,
+    // el hijo derecho arriba y el izquierdo abajo
+    function dibujarArbol(nodo, nivel) {
+      if (nodo == null) return "";
+      return dibujarArbol(nodo.der, nivel + 1) +
+             "      ".repeat(nivel) + nodo.valor + "\n" +
+             dibujarArbol(nodo.izq, nivel + 1);
+    }
+
+    // ============================================================
+    // TAREA 1: infija -> postfija -> árbol -> preorder y postorder
+    // ============================================================
+
+    // Convierte la expresión infija a postfija (algoritmo con pila).
+    // También revisa que la expresión esté bien escrita.
+    function infijaAPostfija(cadena) {
+      let salida = [];
+      let pila = [];
+      let esperaNumero = true; // true: toca número o "(", false: toca operador o ")"
+      let parentesis = 0;
+
+      if (cadena.length == 0) throw new Error("escribe una expresión");
+
+      for (let i = 0; i < cadena.length; i++) {
+        let c = cadena[i];
+
+        if (esDigito(c)) {
+          if (!esperaNumero) throw new Error("falta un operador antes de " + c + " (solo números de 1 dígito)");
+          salida.push(c);
+          esperaNumero = false;
+
+        } else if (c == "(") {
+          if (!esperaNumero) throw new Error("falta un operador antes de '('");
+          pila.push(c);
+          parentesis++;
+
+        } else if (c == ")") {
+          if (esperaNumero) throw new Error("falta un número antes de ')'");
+          if (parentesis == 0) throw new Error("hay un ')' sin su '('");
+          while (pila[pila.length - 1] != "(") {
+            salida.push(pila.pop());
+          }
+          pila.pop(); // se quita el "("
+          parentesis--;
+
+        } else if (esOperador(c)) {
+          if (esperaNumero) throw new Error("falta un número antes del operador " + c);
+          // Se sacan los operadores de la pila que tengan igual o mayor prioridad
+          while (pila.length > 0 &&
+                 pila[pila.length - 1] != "(" &&
+                 prioridad(pila[pila.length - 1]) >= prioridad(c)) {
+            salida.push(pila.pop());
+          }
+          pila.push(c);
+          esperaNumero = true;
+
+        } else {
+          throw new Error("carácter no válido: " + c);
+        }
+      }
+
+      if (esperaNumero) throw new Error("la expresión está incompleta");
+      if (parentesis > 0) throw new Error("falta cerrar un paréntesis");
+
+      while (pila.length > 0) {
+        salida.push(pila.pop());
+      }
+      return salida;
+    }
+
+    // Construye el árbol binario a partir de la lista en postfija
+    function construirArbol(postfija) {
+      let pila = [];
+      for (let i = 0; i < postfija.length; i++) {
+        let nodo = crearNodo(postfija[i]);
+        if (esOperador(nodo.valor)) {
+          // El primero que sale es el hijo derecho
+          nodo.der = pila.pop();
+          nodo.izq = pila.pop();
+        }
+        pila.push(nodo);
+      }
+      return pila.pop(); // la raíz
+    }
+
+    function tarea1() {
+      escribir("out1", "");
+      let cadena = quitarEspacios(document.getElementById("infija").value);
+
+      try {
+        let postfija = infijaAPostfija(cadena);
+        let raiz = construirArbol(postfija);
+
+        let listaPre = [];
+        preorder(raiz, listaPre);
+        let listaPost = [];
+        postorder(raiz, listaPost);
+
+        let resultado = resolverArbol(raiz);
+
+        escribir("out1",
+          "Preorder:  " + listaPre.join(" ") + "\n" +
+          "Postorder: " + listaPost.join(" ") + "\n" +
+          "Resultado: " + formato(resultado) + "\n\n" +
+          "Árbol (de lado: raíz a la izquierda, hijo derecho arriba):\n\n" +
+          dibujarArbol(raiz, 0));
+      } catch (e) {
+        escribir("out1", "Error: " + e.message);
+      }
+    }
+
+    // ============================================================
+    // TAREA 2: resolver una expresión en preorder
+    // ============================================================
+
+    function tarea2() {
+      escribir("out2", "");
+      let cadena = quitarEspacios(document.getElementById("preorder").value);
+
+      try {
+        if (cadena.length == 0) throw new Error("escribe una expresión");
+
+        let pila = [];
+        let pasos = "";
+
+        // El preorder se recorre de DERECHA a IZQUIERDA
+        for (let i = cadena.length - 1; i >= 0; i--) {
+          let c = cadena[i];
+
+          if (esDigito(c)) {
+            pila.push(Number(c));
+            pasos += "apilar " + c + "    Pila: " + pila.join(" ") + "\n";
+
+          } else if (esOperador(c)) {
+            // Aquí el primero que sale es el operando izquierdo
+            if (pila.length < 2) throw new Error("faltan números para el operador " + c);
+            let a = pila.pop();
+            let b = pila.pop();
+            let r = operar(c, a, b);
+            pila.push(r);
+            pasos += a + " " + c + " " + b + " = " + formato(r) + "    Pila: " + pila.map(formato).join(" ") + "\n";
+
+          } else {
+            throw new Error("carácter no válido: " + c);
+          }
+        }
+
+        if (pila.length != 1) throw new Error("sobran números o faltan operadores");
+
+        escribir("out2", pasos + "\nResultado: " + formato(pila[0]));
+      } catch (e) {
+        escribir("out2", "Error: " + e.message);
+      }
+    }
+
+    // ============================================================
+    // TAREA 3: resolver una expresión en postorder
+    // ============================================================
+
+    function tarea3() {
+      escribir("out3", "");
+      let cadena = quitarEspacios(document.getElementById("postorder").value);
+
+      try {
+        if (cadena.length == 0) throw new Error("escribe una expresión");
+
+        let pila = [];
+        let pasos = "";
+
+        // El postorder se recorre de IZQUIERDA a DERECHA
+        for (let i = 0; i < cadena.length; i++) {
+          let c = cadena[i];
+
+          if (esDigito(c)) {
+            pila.push(Number(c));
+            pasos += "apilar " + c + "    Pila: " + pila.join(" ") + "\n";
+
+          } else if (esOperador(c)) {
+            // Aquí el primero que sale es el operando derecho
+            if (pila.length < 2) throw new Error("faltan números para el operador " + c);
+            let b = pila.pop();
+            let a = pila.pop();
+            let r = operar(c, a, b);
+            pila.push(r);
+            pasos += a + " " + c + " " + b + " = " + formato(r) + "    Pila: " + pila.map(formato).join(" ") + "\n";
+
+          } else {
+            throw new Error("carácter no válido: " + c);
+          }
+        }
+
+        if (pila.length != 1) throw new Error("sobran números o faltan operadores");
+
+        escribir("out3", pasos + "\nResultado: " + formato(pila[0]));
+      } catch (e) {
+        escribir("out3", "Error: " + e.message);
+      }
+    }
+  </script>
+</body>
+</html>
